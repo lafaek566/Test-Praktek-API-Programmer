@@ -1,11 +1,28 @@
 const mysql = require("mysql2");
-require("dotenv").config();
+const config = require("./config");
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+const dbConfig = config.db.url
+  ? { uri: config.db.url }
+  : {
+      host: config.db.host,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.database,
+    };
+
+// Create a connection pool
+const pool = config.db.url
+  ? mysql.createPool(dbConfig.uri)
+  : mysql.createPool(dbConfig);
+
+// Check connection
+pool.getConnection((err, connection) => {
+  if (err) {
+    console.error("Database connection failed:", err.message || err);
+    return;
+  }
+  console.log("Database connected successfully!");
+  connection.release();
 });
 
 module.exports = pool;
