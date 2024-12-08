@@ -1,45 +1,89 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const db = require("../config/db");
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import db from "../config/db.js";
 
-exports.register = (req, res) => {
-  const { username, password } = req.body;
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: This endpoint allows a user to register.
+ *     operationId: registerUser
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/User'
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       500:
+ *         description: Internal server error
+ */
+export const register = async (req, res) => {
+  const { username, email, password } = req.body;
 
-  if (!username || !password) {
-    return res
-      .status(400)
-      .json({ message: "Username and password are required." });
+  try {
+    const hashPassword = await bcrypt.hash(password, 10);
+    await db.query(
+      "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+      [username, email, hashPassword]
+    );
+    res.status(201).json({ message: "User registered successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const query = `INSERT INTO users (username, password) VALUES (?, ?)`;
-
-  db.query(query, [username, hashedPassword], (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: "Error registering user." });
-    }
-    res.status(201).json({ message: "User registered successfully!" });
-  });
 };
 
-exports.login = (req, res) => {
-  const { username, password } = req.body;
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login user
+ *     description: This endpoint allows a user to login.
+ *     operationId: loginUser
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Invalid credentials
+ */
+export const login = async (req, res) => {
+  const { email, password } = req.body;
 
-  const query = `SELECT * FROM users WHERE username = ?`;
+  try {
+    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
+    const user = users[0];
 
-  db.query(query, [username], (err, results) => {
-    if (err || results.length === 0) {
-      return res.status(400).json({ message: "User not found." });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    const user = results[0];
-    if (!bcrypt.compareSync(password, user.password)) {
-      return res.status(400).json({ message: "Invalid password." });
-    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
-    res.status(200).json({ message: "Login successful", token });
-  });
+    res.json({ token });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };

@@ -1,54 +1,82 @@
-const db = require("../config/db");
+import db from "../config/db.js";
 
-exports.createTransaction = (req, res) => {
-  const { userId } = req.params;
-  const { type, amount, description } = req.body;
+/**
+ * @swagger
+ * /balance:
+ *   get:
+ *     summary: Get user balance
+ *     description: This endpoint allows the user to view their balance.
+ *     operationId: getBalance
+ *     tags:
+ *       - Balance
+ *     responses:
+ *       200:
+ *         description: Balance retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+export const getBalance = async (req, res) => {
+  const userId = req.user.id;
 
-  if (!type || !amount || amount <= 0) {
-    return res.status(400).json({ message: "Invalid transaction details." });
+  try {
+    const [rows] = await db.query("SELECT balance FROM users WHERE id = ?", [
+      userId,
+    ]);
+    res.json({ balance: rows[0].balance });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
+};
 
-  const query = `SELECT balance FROM users WHERE id = ?`;
+/**
+ * @swagger
+ * /transaction/pay:
+ *   post:
+ *     summary: Pay for a service
+ *     description: This endpoint allows the user to pay for a service.
+ *     operationId: payForService
+ *     tags:
+ *       - Transaction
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               service:
+ *                 type: string
+ *               amount:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Payment successful
+ *       400:
+ *         description: Insufficient balance
+ */
+export const pay = async (req, res) => {
+  const userId = req.user.id;
+  const { service, amount } = req.body;
 
-  db.query(query, [userId], (err, results) => {
-    if (err || results.length === 0) {
-      return res.status(404).json({ message: "User not found." });
-    }
+  try {
+    const [rows] = await db.query("SELECT balance FROM users WHERE id = ?", [
+      userId,
+    ]);
+    const balance = rows[0].balance;
 
-    const user = results[0];
-    let newBalance = user.balance;
+    if (balance < amount)
+      return res.status(400).json({ message: "Insufficient balance" });
 
-    if (type === "payment" && newBalance < amount) {
-      return res.status(400).json({ message: "Insufficient balance." });
-    }
-
-    newBalance = type === "top-up" ? newBalance + amount : newBalance - amount;
-
-    const updateQuery = `UPDATE users SET balance = ? WHERE id = ?`;
-
-    db.query(updateQuery, [newBalance, userId], (err, result) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ message: "Error processing transaction." });
-      }
-
-      const transactionQuery = `INSERT INTO transactions (user_id, type, amount, description) VALUES (?, ?, ?, ?)`;
-      db.query(
-        transactionQuery,
-        [userId, type, amount, description],
-        (err, result) => {
-          if (err) {
-            return res
-              .status(500)
-              .json({ message: "Error logging transaction." });
-          }
-
-          res
-            .status(200)
-            .json({ message: "Transaction completed successfully!" });
-        }
-      );
-    });
-  });
+    await db.query("UPDATE users SET balance = balance - ? WHERE id = ?", [
+      amount,
+      userId,
+    ]);
+    await db.query(
+      "INSERT INTO transactions (user_id, service, amount) VALUES (?, ?, ?)",
+      [userId, service, amount]
+    );
+    res.json({ message: `Payment for ${service} successful` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };

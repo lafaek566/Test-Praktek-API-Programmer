@@ -1,7 +1,15 @@
-const express = require("express");
+import express from "express";
+import { pay } from "../controllers/transactionController.js";
+import authenticate from "../middleware/authenticate.js";
+
 const router = express.Router();
-const { createTransaction } = require("../controllers/transactionController");
 
-router.post("/:userId", createTransaction);
+/**
+ * @swagger
+ * /transaction/pay:
+ *   post:
+ *     summary: Pay for a service
+ */
+router.post("/pay", authenticate, pay);
 
-module.exports = router;
+export default router;

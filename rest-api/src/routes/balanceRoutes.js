@@ -1,8 +1,15 @@
-const express = require("express");
+import express from "express";
+import authenticate from "../middleware/authenticate.js"; // Ensure this path is correct
+import { getBalance } from "../controllers/transactionController.js";
+
 const router = express.Router();
-const { checkBalance, topUp } = require("../controllers/balanceController");
 
-router.get("/:userId", checkBalance);
-router.post("/:userId/topup", topUp);
+/**
+ * @swagger
+ * /balance:
+ *   get:
+ *     summary: Get user balance
+ */
+router.get("/balance", authenticate, getBalance);
 
-module.exports = router;
+export default router;
