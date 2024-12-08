@@ -1,39 +1,6 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 
-/**
- * Swagger setup
- * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       required:
- *         - username
- *         - email
- *         - password
- *       properties:
- *         username:
- *           type: string
- *         email:
- *           type: string
- *         password:
- *           type: string
- *     Transaction:
- *       type: object
- *       required:
- *         - user_id
- *         - service
- *         - amount
- *       properties:
- *         user_id:
- *           type: integer
- *         service:
- *           type: string
- *         amount:
- *           type: integer
- */
-
 const options = {
   definition: {
     openapi: "3.0.0",
@@ -46,6 +13,20 @@ const options = {
     servers: [
       {
         url: "http://localhost:5001", // Your server URL
+      },
+    ],
+    components: {
+      securitySchemes: {
+        Bearer: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT", // Format token sebagai JWT
+        },
+      },
+    },
+    security: [
+      {
+        Bearer: [], // Ini digunakan untuk setiap endpoint yang memerlukan autentikasi
       },
     ],
   },

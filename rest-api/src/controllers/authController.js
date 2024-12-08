@@ -1,6 +1,7 @@
+// routes/authRoutes.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import db from "../config/db.js";
+import pool from "../config/db.js"; // Use the pool from the database config
 
 /**
  * @swagger
@@ -26,14 +27,17 @@ import db from "../config/db.js";
 export const register = async (req, res) => {
   const { username, email, password } = req.body;
 
+  console.log("Register request:", req.body); // Log request body for debugging
+
   try {
     const hashPassword = await bcrypt.hash(password, 10);
-    await db.query(
+    const [result] = await pool.query(
       "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
       [username, email, hashPassword]
     );
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.error("Registration error:", error); // Log error for debugging
     res.status(500).json({ message: error.message });
   }
 };
@@ -68,7 +72,7 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const [users] = await db.query("SELECT * FROM users WHERE email = ?", [
+    const [users] = await pool.query("SELECT * FROM users WHERE email = ?", [
       email,
     ]);
     const user = users[0];
@@ -79,11 +83,14 @@ export const login = async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ message: "Invalid credentials" });
 
+    // Sign JWT with user id as payload
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
     res.json({ token });
   } catch (error) {
+    console.error("Login error:", error); // Log error for debugging
     res.status(500).json({ message: error.message });
   }
 };
